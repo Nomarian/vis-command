@@ -38,6 +38,7 @@ local vis = _G.vis
 
 local Concat = table.concat
 local Popen = io.popen
+local Gsub = string.gsub
 
 ---------------------------------------- MODULE
 
@@ -58,49 +59,52 @@ local _ENV = setmetatable(env, mt)
 
 -- concatenates table of strings into a bourne shell args
 
-local BourneShellArgsT = function (args_as_sequence_of_strings_T)
+local BourneShellArgs = function (args_as_sequence_of_strings_T)
 	local R = args_as_sequence_of_strings_T or {}
 	for i,v in ipairs(R) do
-		R[i] = "'" .. string.gsub(v, "'","'\\''") .. "'"
+		R[i] = Gsub(v, "'", "'\\''")
 	end
-	return R
+	return "'" .. Concat(R, "' '") .. "'"
 end
 
 ---------------------------------------- MAIN
 
 local function Command(argv, force)
-	local command = force and BourneShellArgsT(argv) or Concat(argv, " ")
+	local command = BourneShellArgs(argv)
 	local H = Popen(command) -- BUG: popen does not capture stderr
 	-- it just spits it out immediately
 	local output = H:read"a"
 	local status, msg, code = H:close()
 	if not status then
-		vis:info( ('ERROR: [%d] "%s"'):format(code .. " " .. msg) )
+		vis:info( ('ERROR: [%d] "%s"'):format(code, msg) )
 	end
-	output = output and output:match"^%s*(.+)%s*$"
-	if output and #output>0 then
+	if output and output:find"%S" then
 		vis:message(output)
 	end
-	vis:message(M.DIVIDER)
 end
 
 -- what if selection/range is empty?
 local function PipeCommand(argv, force, win, selection, range)
-	local command = force and BourneShellArgsT(argv) or Concat(argv, " ")
+	local command = BourneShellArgs(argv)
 	local exitN, stdout, stderr = vis:pipe(win.file, range, command)
-	if stdout~="" then
-		vis:message("STDOUT:")
-		vis:message(stdout)
-		vis:message(M.DIVIDER)
+	if exitN==0 then
+		if stdout and stdout~="" then vis:message(stdout) end
+		return true
 	end
-	if exitN~=0 then
-		vis:info(("Exit status: %d"):format(exitN))
-		if stderr~="" then
-			vis:message("STDERR:")
-			vis:message(stderr)
-			vis:message(M.DIVIDER)
-		end
+
+	local msg = {}
+	if stdout and #stdout>0 then
+		table.insert(msg, "STDOUT:")
+		table.insert(msg, stdout)
 	end
+	if stderr and #stderr>0 then
+		table.insert(msg, "STDERR:")
+		table.insert(msg, stderr)
+	end
+	table.insert(msg, M.DIVIDER)
+
+	vis:info( ("Exit status: %d"):format(exitN) )
+	if #msg>0 then vis:message( table.concat(msg, "\n\n") )end
 	return true
 end
 
@@ -119,7 +123,6 @@ end
 
 M.Command = Command
 M.PipeCommand = PipeCommand
-M.DIVIDER = "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 
 mt.__CALL = M.Setup
 
