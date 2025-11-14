@@ -69,7 +69,7 @@ local function Command(argv, force)
 	local output = H:read"a"
 	local status, msg, code = H:close()
 	if not status then
-		vis:info( ('ERROR: [%d] "%s"'):format(code, msg) )
+		vis:info( ('ERROR[%d]: "%s"'):format(code, msg) )
 	end
 	if output and output:find"%S" then
 		vis:message(output)
@@ -113,7 +113,7 @@ end
 
 M.Command = Command
 M.PipeCommand = PipeCommand
-M.DIVIDER "------------------------------"
+M.DIVIDER = "------------------------------"
 mt.__CALL = M.Setup
 
 ---------------------------------------- RETURN
